@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import coordinate_conversions as cc
 from scipy.stats import gaussian_kde
 
 #plt.rc('text', usetex=True)
@@ -17,6 +16,7 @@ def isochrone_grid(isochrone_data : pd.DataFrame,groupby_name):
     return isochrone_list
 
 # tabulates output isochrone data into useful columns based on selection
+
 def tabulate_isochrone_data(data,columns_select,names):
     data = data.T
     data_to_tabulate = data[[columns_select]]
@@ -152,28 +152,22 @@ def plot_best_fit(data,isochrones):
     plt.show()
 #     plt.savefig('/Users/admin/Desktop/orion/orion_populations/ages_plots/' + str(data.label.iloc[0]),overwrite = True,dpi = 300)
 
-
-
-def all_clusters():
-    clusters = df.groupby(['label'])
-    for name,cluster in clusters:
-        isochrones = isochrone_grid(isochrone_data,'logAge')
-        my_data_tabulated, df_bad = tabulate_my_data(cluster)
-    #     age_best_fit = best_fit(my_data_tabulated,isochrones)
-    #     print(age_best_fit)
-        plot_best_fit(my_data_tabulated,isochrones)
-
-def one_cluster(label):
-    cluster = df.loc[df.label==label]
+def one_cluster(cluster,isochrone_data):
     isochrones = isochrone_grid(isochrone_data,'logAge')
     my_data_tabulated, df_bad = tabulate_my_data(cluster)
 #     age_best_fit = best_fit(my_data_tabulated,isochrones)
 #     print(age_best_fit)
     plot_best_fit(my_data_tabulated,isochrones)
+    
+#def all_clusters(df):
+#    clusters = df.groupby(['label'])
+#    for name,cluster in clusters:
+#        isochrones = isochrone_grid(isochrone_data,'logAge')
+#        my_data_tabulated, df_bad = tabulate_my_data(cluster)
+#    #     age_best_fit = best_fit(my_data_tabulated,isochrones)
+#    #     print(age_best_fit)
+#        plot_best_fit(my_data_tabulated,isochrones)
 
-isochrone_file = np.genfromtxt('/Users/admin/Desktop/astro_research/orion/orion_populations/parsec_colibri_isochrones/output43.dat')
-isochrone_data = tabulate_isochrone_data(isochrone_file,[1,2,-1,-2,-3],['MH','logAge','G_RP','G_BP','Gmag'])
-df = df_combined
 
 
 
