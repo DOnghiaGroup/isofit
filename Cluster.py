@@ -12,13 +12,32 @@ from scipy.stats import gaussian_kde
 import scipy.interpolate as interp
 
 class cluster:
+    '''
+    Class to contain attributes and functions for Gaia DR2 data of 
+    a passed in stellar population. Loaded in from pandas.DataFrame
+    of relevant data.
+    
+    Attributes:
+        data -> pd.DataFrame: DataFrame of stellar population. Needed Keys
+            found in README.md
+        name -> str: Given name of population
+        apply_cuts -> bool: Keeps track if cluster has photometric cuts applied
+        photometry -> pd.DataFrame: Reformatted container of data
+    '''
 
     def __init__(self, data : pd.DataFrame, name : str):
+        '''
+        init method
+        '''
+
         self.data = data
         self.name = name
         self.apply_cuts = False
 
     def __str__(self):
+        '''
+        str representation
+        '''
         return '{} cluster with {} stars'.format(self.name,len(self.photometry))
 
     @property
@@ -53,6 +72,11 @@ class cluster:
         self.data = data 
     
     def photometric_cuts(self, cut = None):
+        '''
+        Apply photometric cuts
+        @param cut : Personalized cut in same format as default one defiend
+            below
+        '''
         df = self.photometry
         self.apply_cuts = True
         if cut == None:
@@ -64,6 +88,11 @@ class cluster:
         self.photometry = df[np.invert(cut)]
 
     def plot_cluster_cmd(self, show = True):
+        '''
+        Plots the cluster
+        @param show -> bool: If function should display plot or not
+        @return fig, ax : figure and axis of plot
+        '''
         color = self.photometry.color.values
         abs_mag = self.photometry.abs_mag.values
         xy = np.vstack([color,abs_mag])

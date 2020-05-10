@@ -17,9 +17,17 @@ from Isochrone import isochrone
 
 class grid:
     '''
-    Grid of isochrones.
+    Class to contain functions and attributes for a grid of isochrones
+
+    Attributes:
+        filepath -> str: path to isochrone grid file (downloaded from http://stev.oapd.inaf.it/cgi-bin/cmd_3.3)
+        grid_list -> list: List of Isochrone objects
+        grid_df -> pd.DataFrame: DataFrame representation of isochrone grid
     '''
     def __init__(self, filepath):
+        '''
+        init method that parses the isochrone grid file to define list of isochrones
+        '''
         self.filepath = filepath
         self.grid_list = []
         
@@ -46,9 +54,16 @@ class grid:
             self.grid_list.append(isochrone(color=color, abs_mag=abs_mag, age=age, metallicity=metallicity))
             
     def __str__(self):
+        '''
+        str representation of grid
+        '''
         return 'Grid of {} PARSEC-COLIBRI isochrones with median log age of {}'.format(len(self.grid_list),np.median(self.grid_df['age']))
     
     def plot_grid(self, stellar_pop = None):
+        '''
+        Plots grid of isochrones and can also plot Cluster data
+        @param stellar_pop -> cluster : Cluster object to be plotted with isochrones
+        '''
         if stellar_pop != None:
             fig, ax = stellar_pop.plot_cluster_cmd(show=False)
         else:
@@ -63,6 +78,12 @@ class grid:
 class fitter:
     '''
     Fits isochrone to stellar population
+
+    Attributes:
+        stellar_pop -> cluster: data to be fitted to
+        x -> np.ndarray: cluster's color
+        y -> np.ndarray: cluster's absolute mag
+        isochrones -> grid: grid of isochrones
     '''
 
     def __init__(self, stellar_pop : cluster, isochrones : grid):
@@ -75,6 +96,14 @@ class fitter:
         self.isochrones = isochrones
 
     def interpolate(self,isochrone) -> np.ndarray :
+        '''
+        Interpolates the parsec-colibri models
+        so that their x-axis matches with the 
+        data to calculate the residuals
+        
+        @param isochrone
+        @return y_iso_interp -> np.ndarray
+        '''
 
         x_iso = isochrone.color
         y_iso = isochrone.abs_mag
@@ -88,12 +117,23 @@ class fitter:
         return(y_iso_interp)
             
     def calc_square_error(self):
+        '''
+        Calculates error between model
+        and data assigned it to the __error 
+        attribute of the isochrone
+        '''
         
         for isochrone in self.isochrones.grid_list:
             y_iso = self.interpolate(isochrone)
             isochrone.error = np.sum((self.y - y_iso)**2)
 
     def min_square_error(self) -> isochrone :
+        '''
+        Finds isochrone with minimum
+        square error and returns it
+        Sets this isochrone's best_fit
+        attribute to true
+        '''
         
         self.calc_square_error()
         for i, isochrone in enumerate(self.isochrones.grid_list):
@@ -106,6 +146,10 @@ class fitter:
         return isochrone_best_fit
 
     def plot_best_fit(self):
+        '''
+        Plots the best fit isochrone on 
+        top of the data
+        '''
         
         isochrone = self.min_square_error()
         fig, ax = self.stellar_pop.plot_cluster_cmd(show=False)
