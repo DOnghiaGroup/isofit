@@ -8,9 +8,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
+import scipy.interpolate as interp
 
 from Cluster import cluster
 from Isochrone import isochrone
+
+#np.seterr(divide='ignore')
 
 class grid:
     '''
@@ -32,11 +35,29 @@ class grid:
 
         # Populate list of Isochrone objects to represent grid
         grouped_isochrones = self.grid_df.groupby(['age'])
-        for name, ind_isochrone in grouped_isochrones:
-            self.grid_list.append(isochrone(ind_isochrone['color'].values, ind_isochrone['abs_mag'], ind_isochrone['age'].iloc[0], ind_isochrone['metallicity'].iloc[0]))
 
+        for name, ind_isochrone in grouped_isochrones:
+
+            color = ind_isochrone['color'].values
+            abs_mag = ind_isochrone['abs_mag'].values
+            age = ind_isochrone['age'].iloc[0]
+            metallicity = ind_isochrone['metallicity'].iloc[0]
+
+            self.grid_list.append(isochrone(color=color, abs_mag=abs_mag, age=age, metallicity=metallicity))
+            
     def __str__(self):
         return 'Grid of {} PARSEC-COLIBRI isochrones with median log age of {}'.format(len(self.grid_list),np.median(self.grid_df['age']))
+    
+    def plot_grid(self, stellar_pop = None):
+        if stellar_pop != None:
+            fig, ax = stellar_pop.plot_cluster_cmd(show=False)
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        for isochrone in self.grid_list:
+            ax.plot(isochrone.color, isochrone.abs_mag, c='black', alpha = .6, linewidth=.2)
+        plt.show()
+
 
 
 class fitter:
@@ -53,9 +74,7 @@ class fitter:
 
         self.isochrones = isochrones
 
-        self.isochrone_best_fit
-    
-    def interpolate(self) -> np.ndarray :
+    def interpolate(self,isochrone) -> np.ndarray :
 
         x_iso = isochrone.color
         y_iso = isochrone.abs_mag
@@ -65,22 +84,35 @@ class fitter:
         y_iso = y_iso[np.where(y_iso >= min(self.y))]
 
         f_y = interp.interp1d(x_iso, y_iso, fill_value = 'extrapolate')
-        y_iso_interp = f_y(x)
+        y_iso_interp = f_y(self.x)
         return(y_iso_interp)
             
     def calc_square_error(self):
         
-        for isochrone in self.isochrones:
-            y_iso = interpolate(self)
-            isochrone.error = np.sum((y - y_iso)**2)
+        for isochrone in self.isochrones.grid_list:
+            y_iso = self.interpolate(isochrone)
+            isochrone.error = np.sum((self.y - y_iso)**2)
 
-    def min_square_error(self):
+    def min_square_error(self) -> isochrone :
         
-        calc_square_error(self)
-        for i, isochrone in enumerate(self.isochrones):
+        self.calc_square_error()
+        for i, isochrone in enumerate(self.isochrones.grid_list):
             if i == 0:
                 isochrone_min = isochrone
             elif isochrone.error <= isochrone_min.error:
                 isochrone_min = isochrone
         isochrone_min.best_fit = True
-        self.isochrone_best_fit = isochrone_min 
+        isochrone_best_fit = isochrone_min 
+        return isochrone_best_fit
+
+    def plot_best_fit(self):
+        
+        isochrone = self.min_square_error()
+        fig, ax = self.stellar_pop.plot_cluster_cmd(show=False)
+        ax.plot(isochrone.color, isochrone.abs_mag, c='black', linewidth=1, label=r'$\tau = $' + str(round(10**isochrone.age/1e6,3)) + 'Myr')
+        plt.legend()
+        plt.show()
+
+        
+
+        

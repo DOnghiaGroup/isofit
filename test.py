@@ -12,9 +12,7 @@ lambda_orion_df = df.loc[df.label == 4]
 lambda_orion = cluster(lambda_orion_df,'Lambda Orion')
 lambda_orion.photometric_cuts()
 
+
 my_fitter = fitter(lambda_orion, my_grid)
-
-
-
-
+my_fitter.plot_best_fit()
 

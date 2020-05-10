@@ -6,16 +6,17 @@ Isochroens. Fount at http://stev.oapd.inaf.it/cgi-bin/cmd
 '''
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 class isochrone:
 
     def __init__(self, color : np.ndarray, abs_mag : np.ndarray, age : float, metallicity : float):
         self.color = color 
-        self.abs_mag = color 
+        self.abs_mag = abs_mag 
         self.age = age 
         self.metallicity = metallicity
         self.best_fit = False # Will switch to True if isochrone represents the cluster data
-        self.error = None 
+        self.__error = None 
         
     @property
     def error(self):
@@ -23,7 +24,7 @@ class isochrone:
     
     @error.setter
     def error(self, value):
-        if self.__error != None:
+        if self.__error == None:
             self.__error = value
         else:
             raise TypeError("Isochrone error attribute already had a value")
