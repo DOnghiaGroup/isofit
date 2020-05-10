@@ -32,9 +32,12 @@ class cluster:
             r = self.data['phot_rp_mean_mag'].values
             parallax = self.data['parallax'].values
             label = self.data['label'].values
-            metallicity = self.data['m_h'].values
-            extinction = self.data['a_g_val'].values
-            color_excess = self.data['e_bp_min_rp_val'].values
+            try:
+                metallicity = self.data['m_h'].values
+                extinction = self.data['a_g_val'].values
+                color_excess = self.data['e_bp_min_rp_val'].values
+            except:
+                print('Metallicty, extinction, and color excess values not included')
             
             M_g = g + 5 - (5*np.log10(1000/parallax))
             b_r = b - r
