@@ -111,3 +111,42 @@ class cluster:
             plt.show()
         return fig, ax 
 
+    def plot_metallicity_distribution(self):
+        '''
+        Shows cluster's metallicity distribution. Meant to be used
+        before downloading isochrone grid so that a good estimation
+        of M_H is entered.
+        '''
+
+        metallicity = self.photometry.metallicity.values
+        metallicity = metallicity[~np.isnan(metallicity)]
+        metallicity = metallicity[np.where(metallicity != -9999.)]
+        N = len(metallicity)
+
+        plt.figure()
+        plt.title(self.name + ' N = ' + str(N))
+        plt.xlabel('Metallicty [dex]')
+        plt.ylabel('Count')
+        plt.hist(metallicity, bins = int(np.sqrt(N)), edgecolor = 'black')
+        plt.show()
+    
+    def plot_extinction_distribution(self):
+        '''
+        Shows cluster's distribution in Av to select
+        a good approximation for downloading the
+        isochrone grid
+        '''
+        
+        Av = self.photometry.extinction.values
+        Av = Av[~np.isnan(Av)]
+        Av = Av[np.where(Av != -9999.)]
+        N = len(Av)
+
+        plt.figure()
+        plt.title(self.name + ' N = ' + str(N)) 
+        plt.xlabel('Extinction [mag]')
+        plt.ylabel('Count')
+        plt.hist(Av, bins = int(np.sqrt(N)), edgecolor = 'black')
+        plt.show()
+                  
+                   

@@ -13,7 +13,7 @@ import scipy.interpolate as interp
 from Cluster import cluster
 from Isochrone import isochrone
 
-#np.seterr(divide='ignore')
+np.seterr(divide='ignore')
 
 class grid:
     '''
