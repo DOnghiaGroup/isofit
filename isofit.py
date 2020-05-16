@@ -1,4 +1,6 @@
 '''
+isofit.py
+
 Cameren Swiggum (swiggum2@wisc.edu)
 
 Classes to handle the fitting of isochrones
@@ -75,6 +77,7 @@ class grid:
 
 
 
+
 class fitter:
     '''
     Fits isochrone to stellar population
@@ -92,6 +95,7 @@ class fitter:
         stellar_pop_photometry = self.stellar_pop.photometry
         self.x = stellar_pop_photometry['color']
         self.y = stellar_pop_photometry['abs_mag']
+        self.y_error = stellar_pop_photometry['abs_mag_err']
 
         self.isochrones = isochrones
 
@@ -107,6 +111,8 @@ class fitter:
 
         x_iso = isochrone.color
         y_iso = isochrone.abs_mag
+
+        # Limit the isochrone interpolation to the ranges of the cluster data
         x_iso = x_iso[np.where((x_iso >= min(self.x)) & (x_iso <= max(self.x)))]
         y_iso = y_iso[np.where((x_iso >= min(self.x)) & (x_iso <= max(self.x)))]
         x_iso = x_iso[np.where(y_iso >= min(self.y))]
@@ -115,7 +121,19 @@ class fitter:
         f_y = interp.interp1d(x_iso, y_iso, fill_value = 'extrapolate')
         y_iso_interp = f_y(self.x)
         return(y_iso_interp)
-            
+   
+
+    def calc_chi_square(self):
+        
+        for isochrone in self.isochrones.grid_list:
+            y_iso = self.interpolate(isochrone)
+            isochrone.chi_square = np.sum(((self.y - y_iso)/(self.y_error))**2)
+            print(self.y, y_iso)
+            print('\n')
+#            print(isochrone.chi_square) 
+
+        
+        
     def calc_square_error(self):
         '''
         Calculates error between model
@@ -143,6 +161,7 @@ class fitter:
                 isochrone_min = isochrone
         isochrone_min.best_fit = True
         isochrone_best_fit = isochrone_min 
+        cluster.age = isochrone_best_fit.age
         return isochrone_best_fit
 
     def plot_best_fit(self):
@@ -156,7 +175,4 @@ class fitter:
         ax.plot(isochrone.color, isochrone.abs_mag, c='black', linewidth=1, label=r'$\tau = $' + str(round(10**isochrone.age/1e6,3)) + 'Myr')
         plt.legend()
         plt.show()
-
-        
-
         

@@ -32,6 +32,19 @@ class isochrone:
         self.metallicity = metallicity
         self.best_fit = False 
         self.__error = None 
+        self.chi_square = None
+#
+#    @property
+#    def chi_square(self):
+#        return self.chi_square
+#    
+#    @chi_square.setter
+#    def chi_square(self, value):
+#        if self.chi_square == None:
+#            self.chi_square = value
+#        else:
+#            raise TypeError("Isochrone chi square attribute already had a value")
+#
         
     @property
     def error(self):

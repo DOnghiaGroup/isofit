@@ -1,4 +1,6 @@
 '''
+Cluster.py
+
 Cameren Swiggum (swiggum2@wisc.edu)
 
 Class representing a stellar cluster
@@ -33,6 +35,7 @@ class cluster:
         self.data = data
         self.name = name
         self.apply_cuts = False
+        self.age = None
 
     def __str__(self):
         '''
@@ -50,6 +53,7 @@ class cluster:
             b = self.data['phot_bp_mean_mag'].values
             r = self.data['phot_rp_mean_mag'].values
             parallax = self.data['parallax'].values
+            parallax_error = self.data['parallax_error'].values
             label = self.data['label'].values
             try:
                 metallicity = self.data['m_h'].values
@@ -59,9 +63,10 @@ class cluster:
                 print('Metallicty, extinction, and color excess values not included')
             
             M_g = g + 5 - (5*np.log10(1000/parallax))
+            error_M_g = 0.434*(parallax_error/parallax)
             b_r = b - r
 
-            cluster_dict = {"abs_mag" : M_g, "color" : b_r, 'metallicity': metallicity, 'extinction' : extinction, 'color_excess' : color_excess, 'label' : label}
+            cluster_dict = {"abs_mag" : M_g, "color" : b_r, 'metallicity': metallicity, 'extinction' : extinction, 'parallax' : parallax, 'parallax_error' : parallax_error, 'color_excess' : color_excess,'abs_mag_err' : error_M_g, 'label' : label}
             return pd.DataFrame(cluster_dict)
 
         else:
@@ -148,5 +153,16 @@ class cluster:
         plt.ylabel('Count')
         plt.hist(Av, bins = int(np.sqrt(N)), edgecolor = 'black')
         plt.show()
+
+    
                   
-                   
+    def plot_abs_mag_distribution(self):
+        '''
+        Plots the distribution of abs_mags
+        '''
+        abs_mag = self.photometry.abs_mag.values
+        plt.figure()
+        plt.xlabel(r'$M_G$')
+        plt.ylabel('Count')
+        plt.hist(abs_mag, bins = int(np.sqrt(len(abs_mags))), edgecolor = 'black')
+        plt.show()
