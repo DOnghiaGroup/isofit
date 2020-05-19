@@ -43,6 +43,8 @@ class cluster:
         '''
         return '{} cluster with {} stars'.format(self.name,len(self.photometry))
 
+
+
     @property
     def photometry(self) -> pd.DataFrame :
         '''
@@ -63,7 +65,13 @@ class cluster:
                 print('Metallicty, extinction, and color excess values not included')
             
             M_g = g + 5 - (5*np.log10(1000/parallax))
-            error_M_g = 0.434*(parallax_error/parallax)
+
+
+
+            g_flux = self.data['phot_g_mean_flux'].values
+            g_flux_err = self.data['phot_g_mean_flux_error'].values
+            error_M_g = error_abs_mag(g_flux, g_flux_err, parallax, parallax_error)
+#            error_M_g = 0.434*(parallax_error/parallax)
             b_r = b - r
 
             cluster_dict = {"abs_mag" : M_g, "color" : b_r, 'metallicity': metallicity, 'extinction' : extinction, 'parallax' : parallax, 'parallax_error' : parallax_error, 'color_excess' : color_excess,'abs_mag_err' : error_M_g, 'label' : label}
@@ -164,5 +172,32 @@ class cluster:
         plt.figure()
         plt.xlabel(r'$M_G$')
         plt.ylabel('Count')
-        plt.hist(abs_mag, bins = int(np.sqrt(len(abs_mags))), edgecolor = 'black')
+        plt.hist(abs_mag, bins = int(np.sqrt(len(abs_mag))), edgecolor = 'black')
         plt.show()
+  
+
+'''
+Helper functions
+'''
+
+def error_abs_mag(gflux, gflux_error, parallax, parallax_error):
+    '''
+    Propagates errors in magnitudes (flux) and parallax 
+    to get estimate on absolute G-band mag. Possibly not
+    the best estimation since magnitudes are not symmetric
+    in similarity to flux-space.
+
+    References: (1) https://arxiv.org/pdf/1804.09368.pdf
+                (2) http://gaia.ari.uni-heidelberg.de/gaia-workshop-2018/files/Gaia_DR2_photometry.pdf
+    '''
+
+    sigma_g_zp = 0.0018 # Uncertainty in G mag zeropoint (1)
+    sigma_g = np.sqrt((1.086*gflux_error/gflux)**2 + sigma_g_zp**2)
+
+    # Hopefully this error propagation is correct
+    # Obtained by propagating errors for M_g = G + 5 - 5log10(1000/parallax)
+    sigma_abs_mag = np.sqrt(parallax_error**2 + ((5*sigma_g)/parallax/np.log(10)))
+    #plt.figure()
+    #plt.hist(sigma_abs_mag, edgecolor = 'black', bins = int(np.sqrt(len(sigma_abs_mag))))
+    #plt.show()
+    return sigma_abs_mag

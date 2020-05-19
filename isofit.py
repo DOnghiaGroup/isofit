@@ -124,15 +124,18 @@ class fitter:
    
 
     def calc_chi_square(self):
-        
+        '''
+        Calculates the chi^2 value for each isochrone relative to data and 
+        its errors.
+        '''
+        error = []
         for isochrone in self.isochrones.grid_list:
             y_iso = self.interpolate(isochrone)
-            isochrone.chi_square = np.sum(((self.y - y_iso)/(self.y_error))**2)
-            print(self.y, y_iso)
-            print('\n')
-#            print(isochrone.chi_square) 
+            isochrone.error = np.sum(((self.y - y_iso)/(self.y_error))**2)
+            error.append(isochrone.error)
+        error = np.array(error)
+        error = error[np.isfinite(error)]
 
-        
         
     def calc_square_error(self):
         '''
@@ -145,15 +148,22 @@ class fitter:
             y_iso = self.interpolate(isochrone)
             isochrone.error = np.sum((self.y - y_iso)**2)
 
-    def min_square_error(self) -> isochrone :
+    def min_error(self,type_fit) -> isochrone :
         '''
         Finds isochrone with minimum
         square error and returns it
         Sets this isochrone's best_fit
         attribute to true
         '''
+            
+        if type_fit == 'least squares':
+            self.calc_square_error()
+
+        elif type_fit == 'chi2':
+            self.calc_chi_square()
         
-        self.calc_square_error()
+
+
         for i, isochrone in enumerate(self.isochrones.grid_list):
             if i == 0:
                 isochrone_min = isochrone
@@ -164,13 +174,13 @@ class fitter:
         cluster.age = isochrone_best_fit.age
         return isochrone_best_fit
 
-    def plot_best_fit(self):
+    def plot_best_fit(self, type_fit = 'chi2'):
         '''
         Plots the best fit isochrone on 
         top of the data
         '''
         
-        isochrone = self.min_square_error()
+        isochrone = self.min_error('chi2')
         fig, ax = self.stellar_pop.plot_cluster_cmd(show=False)
         ax.plot(isochrone.color, isochrone.abs_mag, c='black', linewidth=1, label=r'$\tau = $' + str(round(10**isochrone.age/1e6,3)) + 'Myr')
         plt.legend()
