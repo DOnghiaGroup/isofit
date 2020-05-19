@@ -42,7 +42,6 @@ class grid:
 
         # DataFrame representation of grid
         self.grid_df = pd.DataFrame({'color':grid_colors, 'abs_mag':grid_abs_mags, 'age':grid_ages, 'metallicity':grid_metallicity}) 
-
         # Populate list of Isochrone objects to represent grid
         grouped_isochrones = self.grid_df.groupby(['age'])
 

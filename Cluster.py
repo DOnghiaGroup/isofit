@@ -28,6 +28,7 @@ class cluster:
     '''
 
     def __init__(self, data : pd.DataFrame, name : str):
+
         '''
         init method
         '''
