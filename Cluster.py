@@ -14,6 +14,7 @@ from scipy.stats import gaussian_kde
 import scipy.interpolate as interp
 
 class cluster:
+    
     '''
     Class to contain attributes and functions for Gaia DR2 data of 
     a passed in stellar population. Loaded in from pandas.DataFrame
@@ -71,7 +72,7 @@ class cluster:
 
             g_flux = self.data['phot_g_mean_flux'].values
             g_flux_err = self.data['phot_g_mean_flux_error'].values
-            error_M_g = error_abs_mag(g_flux, g_flux_err, parallax, parallax_error)
+            error_M_g = error_abs_mag_parallax(M_g, parallax, parallax_error)
 #            error_M_g = 0.434*(parallax_error/parallax)
             b_r = b - r
 
@@ -176,29 +177,44 @@ class cluster:
         plt.hist(abs_mag, bins = int(np.sqrt(len(abs_mag))), edgecolor = 'black')
         plt.show()
   
-
 '''
 Helper functions
 '''
 
-def error_abs_mag(gflux, gflux_error, parallax, parallax_error):
+def error_abs_mag_parallax(Mg, parallax, parallax_error):
     '''
-    Propagates errors in magnitudes (flux) and parallax 
-    to get estimate on absolute G-band mag. Possibly not
-    the best estimation since magnitudes are not symmetric
-    in similarity to flux-space.
+    Returns error on abs_mag solely based on parallax errors
 
-    References: (1) https://arxiv.org/pdf/1804.09368.pdf
-                (2) http://gaia.ari.uni-heidelberg.de/gaia-workshop-2018/files/Gaia_DR2_photometry.pdf
+    @param Mg : Absolute magnitudes in the G band
+    @param parallax : Parallax values
+    @param parallax_error : Errors in parallax
+    @return error_abs_mag : Errors in absolute magntidue of G band
     '''
+    error_abs_mag = np.abs(Mg)*np.sqrt((parallax_error/parallax)**2) 
+    return error_abs_mag 
 
-    sigma_g_zp = 0.0018 # Uncertainty in G mag zeropoint (1)
-    sigma_g = np.sqrt((1.086*gflux_error/gflux)**2 + sigma_g_zp**2)
 
-    # Hopefully this error propagation is correct
-    # Obtained by propagating errors for M_g = G + 5 - 5log10(1000/parallax)
-    sigma_abs_mag = np.sqrt(parallax_error**2 + ((5*sigma_g)/parallax/np.log(10)))
-    #plt.figure()
-    #plt.hist(sigma_abs_mag, edgecolor = 'black', bins = int(np.sqrt(len(sigma_abs_mag))))
-    #plt.show()
-    return sigma_abs_mag
+
+# TODO : This is wrong!
+#def error_abs_mag(gflux, gflux_error, parallax, parallax_error):
+#    '''
+#    
+#    Propagates errors in magnitudes (flux) and parallax 
+#    to get estimate on absolute G-band mag. Possibly not
+#    the best estimation since magnitudes are not symmetric
+#    in similarity to flux-space.
+#
+#    References: (1) https://arxiv.org/pdf/1804.09368.pdf
+#                (2) http://gaia.ari.uni-heidelberg.de/gaia-workshop-2018/files/Gaia_DR2_photometry.pdf
+#    '''
+#    
+#    sigma_g_zp = 0.0018 # Uncertainty in G mag zeropoint (1)
+#    sigma_g = np.sqrt((1.086*gflux_error/gflux)**2 + sigma_g_zp**2)
+#
+#    # Hopefully this error propagation is correct
+#    # Obtained by propagating errors for M_g = G + 5 - 5log10(1000/parallax)
+#    sigma_abs_mag = np.sqrt(parallax_error**2 + ((5*sigma_g)/parallax/np.log(10)))
+#    #plt.figure()
+#    #plt.hist(sigma_abs_mag, edgecolor = 'black', bins = int(np.sqrt(len(sigma_abs_mag))))
+#    #plt.show()
+#    return sigma_abs_mag
