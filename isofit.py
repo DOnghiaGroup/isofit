@@ -6,6 +6,7 @@ Cameren Swiggum (swiggum2@wisc.edu)
 Classes to handle the fitting of isochrones
 to a stellar population
 '''
+import os 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -42,17 +43,43 @@ class grid:
 
         # DataFrame representation of grid
         self.grid_df = pd.DataFrame({'color':grid_colors, 'abs_mag':grid_abs_mags, 'age':grid_ages, 'metallicity':grid_metallicity}) 
+
         # Populate list of Isochrone objects to represent grid
-        grouped_isochrones = self.grid_df.groupby(['age'])
 
-        for name, ind_isochrone in grouped_isochrones:
+        if len(set(grid_metallicity)) == 1: # Checks to see if metallicity values are varrying
+            grouped_isochrones = self.grid_df.groupby(['age'])
+            self.grid_list = populate_isochrone_list(grouped_isochrones) 
 
-            color = ind_isochrone['color'].values
-            abs_mag = ind_isochrone['abs_mag'].values
-            age = ind_isochrone['age'].iloc[0]
-            metallicity = ind_isochrone['metallicity'].iloc[0]
+        else:
+            grouped_isochrones = self.grid_df.groupby(['metallicity', 'age'])
+            self.grid_list = populate_isochrone_list(grouped_isochrones) 
+          
 
-            self.grid_list.append(isochrone(color=color, abs_mag=abs_mag, age=age, metallicity=metallicity))
+    @classmethod
+    def large_grid(cls, path_to_grid_directory):
+        '''
+        Takes into account a grid of Isochrones with varying metallicity
+        and extinction (Av) values. Directory should be formated as multiple
+        subdirectories representing different extinction values and PARSEC files
+        should contain metallicity (along with age) variations, themselves.
+        '''
+        directory = os.fsencode(path_to_grid_directory)
+
+        # Each index of isochrone_large_grid will correspond to an isochrone grid with a single Av value and varying metallicities.
+        isochrone_large_grid = []
+        for parsec_file in os.listdir(directory):
+
+            parsec_filename = os.fsdecode(parsec_file)
+            if parsec_filename.endswith('.dat'):
+
+                isochrone_grid = cls(
+                        filepath = os.path.join(path_to_grid_directory, parsec_filename)
+                        ) 
+
+                isochrone_large_grid.append(isochrone_grid)
+
+        return isochrone_large_grid
+        
             
     def __str__(self):
         '''
@@ -88,7 +115,12 @@ class fitter:
         isochrones -> grid: grid of isochrones
     '''
 
-    def __init__(self, stellar_pop : cluster, isochrones : grid):
+    def __init__(self, stellar_pop : cluster, isochrones_grid : list):
+        '''
+        init method for fitter
+        @param stellar_pop -> cluster, stellar grouping data cluster object
+        @param isochrones -> list, list of isochrone objects
+        '''
 
         self.stellar_pop = stellar_pop
         stellar_pop_photometry = self.stellar_pop.photometry
@@ -96,7 +128,8 @@ class fitter:
         self.y = stellar_pop_photometry['abs_mag']
         self.y_error = stellar_pop_photometry['abs_mag_err']
 
-        self.isochrones = isochrones
+        self.isochrones_grid = isochrones_grid
+        
 
     def interpolate(self,isochrone) -> np.ndarray :
         '''
@@ -128,12 +161,14 @@ class fitter:
         its errors.
         '''
         error = []
-        for isochrone in self.isochrones.grid_list:
-            y_iso = self.interpolate(isochrone)
-            isochrone.error = np.sum(((self.y - y_iso)/(self.y_error))**2)
-            error.append(isochrone.error)
-        error = np.array(error)
-        error = error[np.isfinite(error)]
+        
+        for isochrones in self.isochrones_grid:
+            for isochrone in isochrones.grid_list:
+                y_iso = self.interpolate(isochrone)
+                isochrone.error = np.sum(((self.y - y_iso)/(self.y_error))**2)
+#                error.append(isochrone.error)
+#        error = np.array(error)
+#        error = error[np.isfinite(error)]
 
         
     def calc_square_error(self):
@@ -143,11 +178,12 @@ class fitter:
         attribute of the isochrone
         '''
         
-        for isochrone in self.isochrones.grid_list:
-            y_iso = self.interpolate(isochrone)
-            isochrone.error = np.sum((self.y - y_iso)**2)
+        for isochrones in self.isochrones_grid:
+            for isochrone in isochrones.grid_list:
+                y_iso = self.interpolate(isochrone)
+                isochrone.error = np.sum((self.y - y_iso)**2)
 
-    def min_error(self,type_fit) -> isochrone :
+    def min_error(self,type_fit):
         '''
         Finds isochrone with minimum
         square error and returns it
@@ -161,27 +197,54 @@ class fitter:
         elif type_fit == 'chi2':
             self.calc_chi_square()
         
+        for i, isochrones in enumerate(self.isochrones_grid):
 
+            for isochrone in isochrones.grid_list:
 
-        for i, isochrone in enumerate(self.isochrones.grid_list):
-            if i == 0:
-                isochrone_min = isochrone
-            elif isochrone.error <= isochrone_min.error:
-                isochrone_min = isochrone
+                if i == 0:
+                    isochrone_min = isochrone
+
+                elif isochrone.error < isochrone_min.error:
+                    isochrone_min = isochrone
+
         isochrone_min.best_fit = True
         isochrone_best_fit = isochrone_min 
         cluster.age = isochrone_best_fit.age
         return isochrone_best_fit
 
-    def plot_best_fit(self, type_fit = 'chi2'):
+    def return_best_fit(self, type_fit = 'chi2', plot = True, save = False, save_path = None):
         '''
         Plots the best fit isochrone on 
         top of the data
         '''
         
         isochrone = self.min_error('chi2')
-        fig, ax = self.stellar_pop.plot_cluster_cmd(show=False)
-        ax.plot(isochrone.color, isochrone.abs_mag, c='black', linewidth=1, label=r'$\tau = $' + str(round(10**isochrone.age/1e6,3)) + 'Myr')
-        plt.legend()
-        plt.show()
+        if save == True:
+            isochrone.output_isochrone(self.stellar_pop.name)
+        if plot == True:
+            fig, ax = self.stellar_pop.plot_cluster_cmd(show=False)
+            ax.plot(isochrone.color,
+                    isochrone.abs_mag,
+                    c='black', 
+                    linewidth=1, 
+                    label=r'$\tau = $' + str(round(10**isochrone.age/1e6,3)) + 'Myr')
+            plt.legend()
+            plt.show()
+        return isochrone.age
+
+
+# Helper functions
+def populate_isochrone_list(grouped_isochrones):
+
+    grid_list = []
+    for name, ind_isochrone in grouped_isochrones:
+
+        color = ind_isochrone['color'].values
+        abs_mag = ind_isochrone['abs_mag'].values
+        age = ind_isochrone['age'].iloc[0]
+        metallicity = ind_isochrone['metallicity'].iloc[0]
+
+        grid_list.append(isochrone(color=color, abs_mag=abs_mag, age=age, metallicity=metallicity))
+    return grid_list
+    
         

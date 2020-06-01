@@ -69,5 +69,22 @@ class isochrone:
             out_str += ' not the best fit.'
 
         return out_str
-    
+
+    def output_isochrone(self, file_to_name):
+        '''
+        Write isochrone out to csv.
+        Useful for saving best fit isochrones 
+        so that analysis doesn't have to be rerun
+        '''
+        N = len(self.color) # length of data points
+
+        color = self.color
+        abs_mag = self.abs_mag
+        metallicity = self.metallicity
+        best_fit = int(self.best_fit)*np.ones(N)
+        age = self.age*np.ones(N)
+
+        df_out = pd.DataFrame({'color' : color, 'abs_mag' : abs_mag, 'metallicity': metallicity, 'best_fit' : best_fit, 'age' : age})
+
+        df_out.to_csv('/Users/cam/Desktop/astro_research/orion/orion_populations/best_fit_isochrones/' + file_to_name)
 

@@ -1,5 +1,8 @@
 *~
 **/__pycache__
 analysis.py
+scatter_plot_ages.py
+plotting_ages.py
+*.html
 *.swp
 *.swo
