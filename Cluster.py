@@ -29,12 +29,18 @@ class cluster:
     '''
 
     def __init__(self, data : pd.DataFrame, name : str, error_type):
+        """__init__.
 
-        '''
-        init method
-        '''
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Stellar cluster data.
+        name : str
+            Name of stellar cluster.
+        error_type : TODO 
+            error_type
+        """
 
-        #self.data = data.loc[data.phot_bp_mean_flux_error < 1000]
         self.data = data
         self.name = name
         self.apply_cuts = False
@@ -42,18 +48,25 @@ class cluster:
         self.error_type = error_type
 
     def __str__(self):
-        '''
-        str representation
-        '''
+        """__str__.
+        """
         return '{} cluster with {} stars'.format(self.name,len(self.photometry))
-
 
 
     @property
     def photometry(self) -> pd.DataFrame :
-        '''
+        """photometry.
+
         Reformats dataframe to contain just relevant info
-        '''
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        pd.DataFrame
+
+        """
         if self.apply_cuts == False:
             g = self.data['phot_g_mean_mag'].values
             b = self.data['phot_bp_mean_mag'].values
@@ -69,9 +82,6 @@ class cluster:
                 print('Metallicty, extinction, and color excess values not included')
             
             M_g = g + 5 - (5*np.log10(1000/parallax))
-
-
-
             g_flux = self.data['phot_g_mean_flux'].values
             g_flux_err = self.data['phot_g_mean_flux_error'].values
            
@@ -100,14 +110,25 @@ class cluster:
 
     @photometry.setter
     def photometry(self, data : pd.DataFrame):
+        """photometry.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Data to be set for photometry.
+        """
         self.data = data 
     
     def photometric_cuts(self, cut = None):
-        '''
+        """photometric_cuts.
         Apply photometric cuts
-        @param cut : Personalized cut in same format as default one defiend
-            below
-        '''
+
+        Parameters
+        ----------
+        cut : 
+            Personalized cut in same format as default one defiend
+        """
+
         df = self.photometry
         self.apply_cuts = True
         if cut == None:
