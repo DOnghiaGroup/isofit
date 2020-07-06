@@ -98,6 +98,7 @@ class grid:
             fig = plt.figure()
             ax = fig.add_subplot(111)
         for isochrone in self.grid_list:
+            ax.set_title('[M/H] = {}'.format(isochrone.metallicity))
             ax.plot(isochrone.color, isochrone.abs_mag, c='black', alpha = .6, linewidth=.2)
         plt.show()
 
@@ -223,6 +224,7 @@ class fitter:
             isochrone.output_isochrone(self.stellar_pop.name)
         if plot == True:
             fig, ax = self.stellar_pop.plot_cluster_cmd(show=False)
+            ax.set_title('[M/H] = {}'.format(isochrone.metallicity))
             ax.plot(isochrone.color,
                     isochrone.abs_mag,
                     c='black', 
