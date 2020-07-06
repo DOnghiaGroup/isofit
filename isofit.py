@@ -162,11 +162,20 @@ class fitter:
         its errors.
         '''
         error = []
+        likelihoods = []
         
         for isochrones in self.isochrones_grid:
             for isochrone in isochrones.grid_list:
+
+                #n_redder = []
+                #n_bluer = []
+                #weights = []
+
+                #for 
+
                 y_iso = self.interpolate(isochrone)
                 isochrone.error = np.sum(((self.y - y_iso)/(self.y_error))**2)
+                
 #                error.append(isochrone.error)
 #        error = np.array(error)
 #        error = error[np.isfinite(error)]
