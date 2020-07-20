@@ -32,6 +32,7 @@ class isochrone:
         self.metallicity = metallicity
         self.best_fit = False 
         self.__error = None 
+        self.likelihood = None
         self.chi_square = None
 #
 #    @property

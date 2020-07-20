@@ -70,7 +70,7 @@ class grid:
         for parsec_file in os.listdir(directory):
 
             parsec_filename = os.fsdecode(parsec_file)
-            if parsec_filename.endswith('.dat'):
+            if parsec_filename.endswith('.txt'):
 
                 isochrone_grid = cls(
                         filepath = os.path.join(path_to_grid_directory, parsec_filename)
@@ -161,20 +161,28 @@ class fitter:
         Calculates the chi^2 value for each isochrone relative to data and 
         its errors.
         '''
-        error = []
-        likelihoods = []
+
+        n_redder = []
+        n_bluer = []
         
+        for x in self.x:
+            n_redder.append(len(np.where(self.x > x)[0]))
+            n_bluer.append(len(np.where(self.x < x)[0]))
+
+        n_redder = np.array(n_redder)
+        n_bluer = np.array(n_bluer)
+        weights = np.sqrt(n_redder/(n_bluer + 1))
+
         for isochrones in self.isochrones_grid:
             for isochrone in isochrones.grid_list:
 
-                #n_redder = []
-                #n_bluer = []
-                #weights = []
-
-                #for 
-
                 y_iso = self.interpolate(isochrone)
-                isochrone.error = np.sum(((self.y - y_iso)/(self.y_error))**2)
+                chi2 = np.sum(((self.y - y_iso)/(self.y_error))**2)
+                likelihood = -(1/2)*np.sum((chi2))
+                isochrone.likelihood = likelihood
+                isochrone.error = chi2
+
+
                 
 #                error.append(isochrone.error)
 #        error = np.array(error)
@@ -214,7 +222,7 @@ class fitter:
                 if i == 0:
                     isochrone_min = isochrone
 
-                elif isochrone.error < isochrone_min.error:
+                elif isochrone.likelihood > isochrone_min.likelihood:
                     isochrone_min = isochrone
 
         isochrone_min.best_fit = True
@@ -228,7 +236,7 @@ class fitter:
         top of the data
         '''
         
-        isochrone = self.min_error('chi2')
+        isochrone = self.min_error(type_fit)
         if save == True:
             isochrone.output_isochrone(self.stellar_pop.name)
         if plot == True:
