@@ -215,15 +215,16 @@ class fitter:
         elif type_fit == 'chi2':
             self.calc_chi_square()
         
-        for i, isochrones in enumerate(self.isochrones_grid):
+        for isochrones in self.isochrones_grid:
 
-            for isochrone in isochrones.grid_list:
+            for i, isochrone in enumerate(isochrones.grid_list):
 
                 if i == 0:
                     isochrone_min = isochrone
 
                 elif isochrone.likelihood > isochrone_min.likelihood:
                     isochrone_min = isochrone
+
 
         isochrone_min.best_fit = True
         isochrone_best_fit = isochrone_min 

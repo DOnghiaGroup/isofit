@@ -17,6 +17,7 @@ def cluster_age_analysis(df, cluster_label : int, cluster_name : str, cost_funct
     iso_grid = grid.large_grid(isochrone_filepath)
     cluster_fitter = fitter(group_cluster, iso_grid)
     age = cluster_fitter.return_best_fit(type_fit = 'chi2', plot = True, save = True)
+
     for g in iso_grid:
         g.plot_grid(stellar_pop = group_cluster)
     return age, df_group
