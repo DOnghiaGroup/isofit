@@ -14,22 +14,13 @@ from scipy.stats import gaussian_kde
 import scipy.interpolate as interp
 
 class cluster:
-    
-    '''
-    Class to contain attributes and functions for Gaia DR2 data of 
-    a passed in stellar population. Loaded in from pandas.DataFrame
-    of relevant data.
-    
-    Attributes:
-        data -> pd.DataFrame: DataFrame of stellar population. Needed Keys
-            found in README.md
-        name -> str: Given name of population
-        apply_cuts -> bool: Keeps track if cluster has photometric cuts applied
-        photometry -> pd.DataFrame: Reformatted container of data
-    '''
 
-    def __init__(self, data : pd.DataFrame, name : str, error_type):
+    def __init__(self, data : pd.DataFrame, name : str, error_type : str):
         """__init__.
+
+        Class to contain attributes and functions for Gaia DR2 data of 
+        a passed in stellar population. Loaded in from pandas.DataFrame
+        of relevant data.
 
         Parameters
         ----------
@@ -37,15 +28,15 @@ class cluster:
             Stellar cluster data.
         name : str
             Name of stellar cluster.
-        error_type : TODO 
-            error_type
+        error_type : str 
+            Uncertainty propagation to use : `astrometric` or `astrometric_photometric`
         """
 
         self.data = data
         self.name = name
-        self.apply_cuts = False
-        self.age = None
-        self.error_type = error_type
+        self.apply_cuts = False # Keeps track if cluster has photometric cuts applied
+        self.age = None # Assigned age from best fit isochrone
+        self.error_type = error_type # Fitting method used to data
 
     def __str__(self):
         """__str__.
@@ -61,11 +52,11 @@ class cluster:
 
         Parameters
         ----------
+        self : Cluster
 
         Returns
         -------
         pd.DataFrame
-
         """
         if self.apply_cuts == False:
             g = self.data['phot_g_mean_mag'].values
@@ -163,92 +154,60 @@ class cluster:
             plt.show()
         return fig, ax 
 
-    def plot_metallicity_distribution(self):
-        '''
-        Shows cluster's metallicity distribution. Meant to be used
-        before downloading isochrone grid so that a good estimation
-        of M_H is entered.
-        '''
-
-        metallicity = self.photometry.metallicity.values
-        metallicity = metallicity[~np.isnan(metallicity)]
-        metallicity = metallicity[np.where(metallicity != -9999.)]
-        N = len(metallicity)
-
-        plt.figure()
-        plt.title(self.name + ' N = ' + str(N))
-        plt.xlabel('Metallicty [dex]')
-        plt.ylabel('Count')
-        plt.hist(metallicity, bins = int(np.sqrt(N)), edgecolor = 'black')
-        plt.show()
-    
-    def plot_extinction_distribution(self):
-        '''
-        Shows cluster's distribution in Av to select
-        a good approximation for downloading the
-        isochrone grid
-        '''
-        
-        Av = self.photometry.extinction.values
-        Av = Av[~np.isnan(Av)]
-        Av = Av[np.where(Av != -9999.)]
-        N = len(Av)
-
-        plt.figure()
-        plt.title(self.name + ' N = ' + str(N)) 
-        plt.xlabel('Extinction [mag]')
-        plt.ylabel('Count')
-        plt.hist(Av, bins = int(np.sqrt(N)), edgecolor = 'black')
-        plt.show()
-
-    
-                  
-    def plot_abs_mag_distribution(self):
-        '''
-        Plots the distribution of abs_mags
-        '''
-        abs_mag = self.photometry.abs_mag.values
-        plt.figure()
-        plt.xlabel(r'$M_G$')
-        plt.ylabel('Count')
-        plt.hist(abs_mag, bins = int(np.sqrt(len(abs_mag))), edgecolor = 'black')
-        plt.show()
-
-    def output_cluster(self, directory):
-        self.photometry.to_csv(directory + self.name)
-
-
-'''
-Helper functions
-'''
-
 def error_abs_mag_parallax(Mg, parallax, parallax_error):
-    '''
-    Returns error on abs_mag solely based on parallax errors
+    """error_abs_mag_parallax.
+    Propagated error to be used in likelihood fit.
 
-    @param Mg : Absolute magnitudes in the G band
-    @param parallax : Parallax values
-    @param parallax_error : Errors in parallax
-    @return error_abs_mag : Errors in absolute magntidue of G band
-    '''
+    Parameters
+    ----------
+    Mg : np.ndarray
+        Absolute magnitude in the Gaia G band
+    parallax : np.ndarray
+        Parallax values
+    parallax_error : np.ndarray
+        Parallax errors
+
+    Returns
+    -------
+    error_abs_mag : np.ndarray
+        Propagated error
+    """
+
     error_abs_mag = np.abs(Mg)*np.sqrt((parallax_error/parallax)**2) 
     return error_abs_mag 
 
 
 
-# TODO : This is wrong!
+# TODO : This is wrong?
 def error_abs_mag(gflux, gflux_error, parallax, parallax_error):
-    '''
-    
+
+    """error_abs_mag.
+
     Propagates errors in magnitudes (flux) and parallax 
     to get estimate on absolute G-band mag. Possibly not
     the best estimation since magnitudes are not symmetric
     in similarity to flux-space.
 
+    Parameters
+    ----------
+    gflux : np.ndarray
+        flux from g band
+    gflux_error : np.ndarray
+        flux error from g band
+    parallax : np.ndarray 
+        parallax
+    parallax_error : np.ndarray
+        parralax error
+
+    Returns
+    -------
+    sigma_abs_mag : np.ndarray
+        Propagated error
+
     References: (1) https://arxiv.org/pdf/1804.09368.pdf
                 (2) http://gaia.ari.uni-heidelberg.de/gaia-workshop-2018/files/Gaia_DR2_photometry.pdf
-    '''
-    
+
+    """
     sigma_g_zp = 0.0018 # Uncertainty in G mag zeropoint (1)
     sigma_g = np.sqrt((1.086*gflux_error/gflux)**2 + sigma_g_zp**2)
 
