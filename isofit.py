@@ -178,7 +178,7 @@ class fitter:
 
                 y_iso = self.interpolate(isochrone)
                 chi2 = np.sum(((self.y - y_iso)/(self.y_error))**2)
-                likelihood = -(1/2)*np.sum((chi2))
+                likelihood = -(1/2)*np.sum((chi2)**weights)
                 isochrone.likelihood = likelihood
                 isochrone.error = chi2
 
@@ -222,7 +222,7 @@ class fitter:
                 if i == 0:
                     isochrone_min = isochrone
 
-                elif isochrone.likelihood > isochrone_min.likelihood:
+                elif isochrone.likelihood < isochrone_min.error:
                     isochrone_min = isochrone
 
 

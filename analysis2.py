@@ -11,7 +11,7 @@ def cluster_age_analysis(df, cluster_label : int, cluster_name : str, cost_funct
     
     df_group = df.loc[df['label'] == cluster_label]
     group_cluster = cluster(df_group, cluster_name, error_type = cost_function)
-    group_cluster.photometric_cuts()
+    #group_cluster.photometric_cuts()
 #    group_cluster.output_cluster(directory = cluster_output_directory)
 
     iso_grid = grid.large_grid(isochrone_filepath)
@@ -24,7 +24,7 @@ def cluster_age_analysis(df, cluster_label : int, cluster_name : str, cost_funct
 
 
 df = pd.read_csv('/Users/cam/Desktop/astro_research/orion/apogee_gaia_sample4.csv')
-df = df.loc[df['probability'] > .25]
+df = df.loc[df['probability'] > .1]
 #df = df.loc[df['phot_bp_mean_mag'] - df['phot_rp_mean_mag'] < 2.2]
 
 age_ngc1980 = cluster_age_analysis(df, 3, 'OBP-near', 'astrometric_photometric')
