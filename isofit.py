@@ -36,8 +36,8 @@ class grid:
         
         # indices [1,2,-1,-2,-3] correspond to: MH, logAge, G_RP, G_BP, Gmag
         isochrones_grid = np.genfromtxt(filepath)
-        grid_colors = isochrones_grid[:,-2] - isochrones_grid[:,-1]
-        grid_abs_mags = isochrones_grid[:,-3]
+        grid_colors = isochrones_grid[:,-3] - isochrones_grid[:,-1]
+        grid_abs_mags = isochrones_grid[:,-4]
         grid_ages = isochrones_grid[:,2]
         grid_metallicity = isochrones_grid[:,1]
 
@@ -146,14 +146,17 @@ class fitter:
         y_iso = isochrone.abs_mag
 
         # Limit the isochrone interpolation to the ranges of the cluster data
-        x_iso = x_iso[np.where((x_iso >= min(self.x)) & (x_iso <= max(self.x)))]
-        y_iso = y_iso[np.where((x_iso >= min(self.x)) & (x_iso <= max(self.x)))]
-        x_iso = x_iso[np.where(y_iso >= min(self.y))]
-        y_iso = y_iso[np.where(y_iso >= min(self.y))]
+        x_iso = x_iso[np.where((y_iso >= min(self.y)) & (y_iso <= max(self.y)))]
+        y_iso = y_iso[np.where((y_iso >= min(self.y)) & (y_iso <= max(self.y)))]
+        #x_iso = x_iso[np.where((x_iso >= min(self.x)) & (x_iso <= max(self.x)))]
+        #y_iso = y_iso[np.where((x_iso >= min(self.x)) & (x_iso <= max(self.x)))]
+        #x_iso = x_iso[np.where(y_iso >= min(self.y))]
+        #y_iso = y_iso[np.where(y_iso >= min(self.y))]
 
         f_y = interp.interp1d(x_iso, y_iso, fill_value = 'extrapolate')
         y_iso_interp = f_y(self.x)
-        return(y_iso_interp)
+        isochrone.y_interp = y_iso_interp
+        #return(y_iso_interp)
    
 
     def calc_chi_square(self):
@@ -176,9 +179,13 @@ class fitter:
         for isochrones in self.isochrones_grid:
             for isochrone in isochrones.grid_list:
 
-                y_iso = self.interpolate(isochrone)
+                self.interpolate(isochrone)
+                y_iso = isochrone.y_interp
                 chi2 = np.sum(((self.y - y_iso)/(self.y_error))**2)
-                likelihood = -(1/2)*np.sum((chi2)**weights)
+                #likelihood = -(1/2)*np.sum((chi2)**weights)
+                a = np.log(1/(np.sqrt(2*np.pi)*self.y_error))
+                b = ((self.y - y_iso)/(self.y_error))**2
+                likelihood = np.sum((a - (1/2)*b)*weights)
                 isochrone.likelihood = likelihood
                 isochrone.error = chi2
 
@@ -198,8 +205,8 @@ class fitter:
         
         for isochrones in self.isochrones_grid:
             for isochrone in isochrones.grid_list:
-                y_iso = self.interpolate(isochrone)
-                isochrone.error = np.sum((self.y - y_iso)**2)
+                self.interpolate(isochrone)
+                isochrone.error = np.sum((self.y - isochrone.y_interp)**2)
 
     def min_error(self,type_fit):
         '''
@@ -215,15 +222,16 @@ class fitter:
         elif type_fit == 'chi2':
             self.calc_chi_square()
         
-        for isochrones in self.isochrones_grid:
+        for i, isochrones in enumerate(self.isochrones_grid):
 
-            for i, isochrone in enumerate(isochrones.grid_list):
+            for j, isochrone in enumerate(isochrones.grid_list):
 
-                if i == 0:
+                if (i == 0) & (j == 0):
                     isochrone_min = isochrone
 
-                elif isochrone.likelihood < isochrone_min.error:
+                elif isochrone.likelihood > isochrone_min.likelihood:
                     isochrone_min = isochrone
+
 
 
         isochrone_min.best_fit = True
@@ -245,9 +253,15 @@ class fitter:
             ax.set_title('[M/H] = {}'.format(isochrone.metallicity))
             ax.plot(isochrone.color,
                     isochrone.abs_mag,
-                    c='black', 
-                    linewidth=1, 
+                    c = 'black',
+                    ls = '--',
+                    lw = .25,
                     label=r'$\tau = $' + str(round(10**isochrone.age/1e6,3)) + 'Myr')
+            #ax.scatter(self.x,
+            #        isochrone.y_interp,
+            #        c='black', 
+            #        s=1, 
+            #        label=r'$\tau = $' + str(round(10**isochrone.age/1e6,3)) + 'Myr')
             plt.legend()
             plt.show()
         return isochrone.age

@@ -34,6 +34,7 @@ class isochrone:
         self.__error = None 
         self.likelihood = None
         self.chi_square = None
+        self.y_interp = None
 #
 #    @property
 #    def chi_square(self):
