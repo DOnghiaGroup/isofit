@@ -34,7 +34,9 @@ class isochrone:
 
         self.best_fit = False # Set to `True` if Fitter calculates Isochrone to be best fit
         self.__error = None 
+        self.likelihood = None
         self.chi_square = None
+        self.y_interp = None
 #
 #    @property
 #    def chi_square(self):

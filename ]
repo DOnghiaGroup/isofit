@@ -1,0 +1,580 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  
+from scipy import stats
+
+from astropy.coordinates import (CartesianRepresentation,
+                                 CartesianDifferential,
+                                 SphericalRepresentation,
+                                 SphericalDifferential)
+
+from astropy.coordinates import (SkyCoord,
+                                 ICRS, 
+                                 Galactic, 
+                                 GalacticLSR, 
+                                 Galactocentric, 
+                                 LSR)
+import astropy.units as u
+import plotly.express as px # Not used so far
+
+import plotly.graph_objects as go
+import plotly.offline as pyo
+
+
+class CompatibleCoordinatesError(Exception):
+    '''
+    Thrown if objects cannot be plotted together in given coordinates
+    '''
+    pass
+
+# TODO: fix this
+def perspective_correction(cluster_icrs):
+    """perspective_correction.
+
+    Corrects for perspective expansion/contraction from
+    high RVs.
+
+    Parameters
+    ----------
+    cluster_icrs :
+        cluster_icrs
+    """
+
+    ra = cluster_icrs.ra.value
+    dec = cluster_icrs.dec.value
+    parallax = 1000/cluster_icrs.distance.value
+    pmra = cluster_icrs.pm_ra_cosdec.value
+    pmdec = cluster_icrs.pm_dec.value
+    rv = cluster_icrs.radial_velocity.value
+
+    ra_c = np.mean(ra)
+    dec_c = np.mean(dec)
+    parallax_c = np.mean(parallax)
+    rv_c = np.median(rv)
+    pmra_c = np.mean(pmra)
+    pmdec_c = np.mean(pmdec)
+    del_ra = ra - ra_c
+    del_dec = dec - dec_c
+
+    del_pmra = del_ra*(pmdec_c*np.sin(dec_c) - (rv_c*parallax_c/4.74)*np.cos(dec_c))
+    del_pmdec = (-del_ra*pmra_c*np.sin(dec_c)) - (del_dec*(rv_c*parallax_c/4.74))
+
+    pmra_corrected = (pmra - del_pmra)*(u.mas/u.yr)
+    pmdec_corrected = (pmdec - del_pmdec)*(u.mas/u.yr)
+
+    cluster_icrs = ICRS(ra = ra*u.deg,
+                        dec = dec*u.deg,
+                        distance = (1000/parallax)*u.pc,
+                        pm_ra_cosdec = pmdec_corrected,
+                        pm_dec = pmdec_corrected,
+                        radial_velocity = rv*(u.km/u.s))
+
+
+    return cluster_icrs
+
+
+def cluster_to_ICRS(df, cluster_number, velocity_cut = None):
+    
+    
+    #df_cut = df.loc[(df['synthvhelio_avg'].notnull()) | (df['radial_velocity'].notnull())]
+    df_cut = df.loc[(df['synthvhelio_avg'].notnull())]
+    #df_cut = df.loc[df['synthverr']/df['synthvhelio_avg'] < .01]
+    if velocity_cut != None:
+        vel_lower, vel_upper = velocity_cut
+        df_cut = df_cut.loc[(df_cut['synthvhelio_avg'] > vel_lower) & (df_cut['synthvhelio_avg'] < vel_upper)]
+
+#    df_cut = df_cut.drop_duplicates(['source_id'])
+    
+    df_cluster = df_cut.loc[df_cut.label == cluster_number]
+    df = df.loc[(df.label == cluster_number) & (df.probability > .1)]
+    #radial_velocities = df_cluster[['synthvhelio_avg','radial_velocity']].mean(axis=1).values*(u.km/u.s)
+
+    radial_velocities = df_cluster['synthvhelio_avg'].values*(u.km/u.s)
+    
+    cluster_icrs = ICRS(
+        ra = df_cluster['ra'].values*u.deg,
+        dec = df_cluster['dec'].values*u.deg,
+        pm_ra_cosdec = df_cluster['pmra'].values*(u.mas/u.yr),
+        pm_dec = df_cluster['pmdec'].values*(u.mas/u.yr),
+        distance = (1000/df_cluster['parallax'].values)*u.pc,
+        radial_velocity = radial_velocities
+    )
+
+    # to be used when correcting for RVs
+    #cluster_icrs = perspective_correction(cluster_icrs)
+
+    cluster_icrs_no_vel = ICRS(
+            ra = df['ra'].values*u.deg,
+            dec = df['dec'].values*u.deg,
+            distance = (1000/df['parallax'].values)*u.pc)
+    
+    return cluster_icrs, cluster_number, cluster_icrs_no_vel
+
+def to_cartesian(cluster_icrs, cluster_number, reference_frame, cluster_icrs_no_vel = None):
+    
+    if cluster_icrs_no_vel != None:
+        ''' For non-velocity data '''
+
+        cluster_cartesian = cluster_icrs_no_vel.transform_to(reference_frame)
+        cluster_cartesian.representation_type = 'cartesian'
+        
+        x = cluster_cartesian.cartesian.x.value
+        y = cluster_cartesian.cartesian.y.value
+        z = cluster_cartesian.cartesian.z.value
+
+        cluster_label = np.ones(len(x))*cluster_number
+        df_cartesian_no_vel = pd.DataFrame({
+            'x' : x,
+            'y' : y,
+            'z' : z})
+
+    cluster_cartesian = cluster_icrs.transform_to(reference_frame)
+    cluster_cartesian.representation_type = 'cartesian'
+    cluster_cartesian.differential_type = 'cartesian'
+    
+    x = cluster_cartesian.cartesian.x.value
+    y = cluster_cartesian.cartesian.y.value
+    z = cluster_cartesian.cartesian.z.value
+    
+    vx = cluster_cartesian.v_x.value
+    vy = cluster_cartesian.v_y.value
+    vz = cluster_cartesian.v_z.value
+    
+    cluster_label = np.ones(len(x))*cluster_number
+    
+    df_cartesian = pd.DataFrame({
+        'x' : x,
+        'y' : y,
+        'z' : z,
+        'vx' : vx,
+        'vy' : vy,
+        'vz' : vz,
+        'label' : cluster_label
+    })
+    
+    return df_cartesian, df_cartesian_no_vel
+
+def plot_2d_projection(df_cartesian):
+    
+    vx_rf = df_cartesian.vx.values - np.median(df_cartesian.vx.values)
+    vy_rf = df_cartesian.vy.values - np.median(df_cartesian.vy.values)
+    vz_rf = df_cartesian.vz.values - np.median(df_cartesian.vz.values)
+   
+    galactic_rf = SkyCoord(x = df_cartesian.x.values*u.pc,
+                           y = df_cartesian.y.values*u.pc,
+                           z = df_cartesian.z.values*u.pc,
+                           v_x = vx_rf*(u.km/u.s),
+                           v_y = vy_rf*(u.km/u.s),
+                           v_z = vz_rf*(u.km/u.s),
+                           representation_type = 'cartesian',
+                           differential_type = 'cartesian'
+                          )
+    galactic_rf = galactic_rf.transform_to(Galactic)
+
+#     galactic_rf.represenation_type = SphericalRepresentation
+#     galactic_rf.differential_type = SphericalDifferential
+    
+    l = galactic_rf.l.value
+    b = galactic_rf.b.value
+    pm_l_cosb = galactic_rf.pm_l_cosb.value
+    pm_b = galactic_rf.pm_b.value
+    
+    plt.figure() 
+    plt.quiver(l, b, pm_l_cosb, pm_b)
+    plt.show()
+
+def plot_radial_dependence(df):
+    
+        cluster_number = df.label.iloc[0]
+        vel_mag = np.sqrt(df.vx**2 + df.vy**2 + df.vz**2)
+        df = df.loc[np.sqrt(df.vx**2 + df.vy**2 + df.vz**2) < 50]
+        
+        x = df.x.values
+        y = df.y.values
+        z = df.z.values
+
+        vx_rf = df.vx.values - np.median(df.vx.values)
+        vy_rf = df.vy.values - np.median(df.vy.values)
+        vz_rf = df.vz.values - np.median(df.vz.values)
+        vel_mag_rf = np.sqrt(vx_rf**2 + vy_rf**2 + vz_rf**2)
+        
+        vel_mag_lb = 0
+        vel_mag_ub = 15
+        
+        x = x[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+        y = y[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+        z = z[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+        vx_rf = vx_rf[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+        vy_rf = vy_rf[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+        vz_rf = vz_rf[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+        
+        distance = np.sqrt((x - np.mean(x))**2 + (y - np.mean(y))**2 + (z - np.mean(z))**2)
+
+        vel_mag_rf = np.sqrt(vx_rf**2 + vy_rf**2 + vz_rf**2)
+        log_d = np.log10(distance)
+        log_v = np.log10(vel_mag_rf)
+        m, b, r, p, std_err = stats.linregress(log_d, log_v)
+        line_fit = m*log_d + b
+
+        plt.figure()
+        plt.scatter(log_d, log_v, s = 1, c = 'black')
+        plt.plot(log_d, line_fit, label = 'R = {}, p = {}'.format(r, p), color = 'orange')
+        plt.xlabel('log[Distance from Cluster Center]')
+        plt.ylabel('log[Speed]')
+        plt.legend()
+        plt.show()        
+
+def to_reference_frame(df, vel_mag_bin, centered = False):
+
+    cluster_number = df.label.iloc[0]
+    vel_mag = np.sqrt(df.vx**2 + df.vy**2 + df.vz**2)
+    df = df.loc[np.sqrt(df.vx**2 + df.vy**2 + df.vz**2) < 50]
+    
+    x = df.x.values
+    y = df.y.values
+    z = df.z.values
+    vx_rf = df.vx.values - np.median(df.vx.values)
+    vy_rf = df.vy.values - np.median(df.vy.values)
+    vz_rf = df.vz.values - np.median(df.vz.values)
+    vel_mag_rf = np.sqrt(vx_rf**2 + vy_rf**2 + vz_rf**2)
+    
+    vel_mag_lb, vel_mag_ub = vel_mag_bin # Range of speeds to display
+    
+    x = x[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+    y = y[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+    z = z[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+    vx_rf = vx_rf[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+    vy_rf = vy_rf[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+    vz_rf = vz_rf[np.where((vel_mag_rf > vel_mag_lb) & (vel_mag_rf < vel_mag_ub))]
+
+    if centered:
+        x = x - np.median(x)
+        y = y - np.median(y)
+        z = z - np.median(z)
+
+
+    
+    return (x, y, z, vx_rf, vy_rf, vz_rf)
+
+def plot_3d_projection(dfs, vel_mag_bin : tuple, aspect_xy, aspect_xz, aspect_yz,  scale = 1, centered = True, arrow_size = 1):
+
+    import plotly.figure_factory as ff
+
+    for df in dfs:
+
+        x, y, z, vx_rf, vy_rf, vz_rf = to_reference_frame(df, vel_mag_bin, centered = centered)
+        
+        fig = ff.create_quiver(x, y, vx_rf, vy_rf,
+                               scale = 1,
+                               arrow_scale=.4,
+                               name = 'quiver',
+                               line_width = 1)
+        fig.update_layout(yaxis=dict(scaleanchor='x', scaleratio=1))
+        fig.show()
+
+        fig = ff.create_quiver(x, z, vx_rf, vz_rf,
+                               scale = 1,
+                               arrow_scale=.4,
+                               name = 'quiver',
+                               line_width = 1)
+        fig.update_layout(yaxis=dict(scaleanchor='x', scaleratio=1))
+        fig.show()
+
+        fig = ff.create_quiver(y, z, vy_rf, vz_rf,
+                               scale = 1,
+                               arrow_scale=.4,
+                               name = 'quiver',
+                               line_width = 1)
+        fig.update_layout(yaxis=dict(scaleanchor='x', scaleratio=1))
+        fig.show()
+
+
+        #fig = plt.figure()
+        #ax = fig.add_subplot(111)
+        #ax.quiver(x, y, vx_rf, vy_rf, scale = scale, width = .004)
+        #ax.set_aspect(aspect_xy)
+        #ax.set_xlabel('x (pc)')
+        #ax.set_ylabel('y (pc)')
+#       # ax.set_facecolor('grey')
+        #ax.grid('on')
+        #plt.show()
+
+        #fig = plt.figure()
+        #ax = fig.add_subplot(111)
+        #ax.quiver(x, z, vx_rf, vz_rf, scale = scale, width = .004)
+        #ax.set_aspect(aspect_xz)
+        #ax.set_xlabel('x (pc)')
+        #ax.set_ylabel('z (pc)')
+        #plt.show()
+
+        #fig = plt.figure()
+        #ax = fig.add_subplot(111)
+        #ax.quiver(y, z, vy_rf, vz_rf, scale = scale, width = .004)
+        #ax.set_aspect(aspect_yz)
+        #ax.set_xlabel('y (pc)')
+        #ax.set_ylabel('z (pc)')
+        #plt.show()
+
+
+
+def plot_3d_plotly(dfs : list, vel_mag_bin : tuple, dfs_no_vel = None, plot_sun = False, plot_radwave = False, 
+        plot_2d = False, show_avg_vel = False, centered = False, cone_size = 1, aspectmode = 'data'):
+
+    """plot_3d_plotly.
+
+    Parameters
+    ----------
+    dfs : list
+        Cartesian data passed in.
+
+    vel_mag_bin : tuple
+        Range of speeds to plot.
+
+    plot_sun : bool
+        Plot Sun True/False.
+
+    plot_radwave : bool
+        Plot Radwave True/False.
+
+    show_avg_vel : bool
+        Show avg velocity True/False.
+
+    centered : bool
+        Center stellar cluster True/False
+
+    cone_size : int
+        cone_size
+
+    aspectmode : str
+        cube or data
+    """
+    
+    
+    if ((centered == True) & (plot_sun == True | plot_radwave == True)):
+        raise CompatibleCoordinatesError('Cannot plot radwave or sun when group is centered')
+    
+    data_list = []
+        
+    for df in dfs:
+
+        x, y, z, vx_rf, vy_rf, vz_rf = to_reference_frame(df, vel_mag_bin, centered = centered)
+
+        if len(x) > 0:
+            if show_avg_vel:
+                x = [np.mean(x)]
+                y = [np.mean(y)]
+                z = [np.mean(z)]
+                vx_rf = [np.median(df.vx.values)]
+                vy_rf = [np.median(df.vy.values)]
+                vz_rf = [np.median(df.vz.values)]
+                
+            x_c = np.mean(x)
+            y_c = np.mean(y)
+            z_c = np.mean(z)
+                
+            data_list.append(go.Cone(x = x, 
+                                    y = y, 
+                                    z = z, 
+                                    u = vx_rf, 
+                                    v = vy_rf, 
+                                    w = vz_rf,
+                                    sizemode = 'scaled',
+                                    sizeref = cone_size,
+                                    cauto = False,
+                                    colorscale = 'Plotly3',
+                                    colorbar = dict(title = 'km/s')
+                                    ))
+            data_list.append(go.Scatter3d(x = [x_c],
+                                          y = [y_c],
+                                          z = [z_c],
+                                          mode = 'markers',
+                                          marker = dict(size = 4, color = 'black')))
+
+
+    if dfs_no_vel != None:
+
+        for df in dfs_no_vel:
+            x = df.x.values
+            y = df.y.values
+            z = df.z.values
+
+            if centered:
+                x = x - np.mean(x)
+                y = y - np.mean(y)
+                z = z - np.mean(z)
+
+            data_list.append(go.Scatter3d(x = x,
+                                          y = y,
+                                          z = z,
+                                          mode = 'markers',
+                                          marker = dict(
+                                              size = 1.5,
+                                              color = 'black',
+                                              opacity = .3
+                                              )
+                                          ))
+
+            # data_list.append(go.Scatter3d(x = [x_c], 
+            #                               y = [y_c], 
+            #                               z = [z_c],
+            #                               marker = dict(
+            #                                   size  = 5,
+            #                                   color = 'black'
+            #                               )
+            #                              ))
+        
+    if plot_sun == True:
+        data_list.append(go.Scatter3d(x = [0], 
+                                  y = [0], 
+                                  z = [0],
+                                  marker = dict(
+                                      size  = 5,
+                                      color = 'yellow'
+                                  )
+                                 ))
+    
+    if plot_radwave == True:
+        
+        df_radwave = pd.read_csv(
+            '/Users/cam/Desktop/astro_research/orion/orion_populations/Best_Fit_Wave_Model.csv')
+        
+
+        x = df_radwave.x.values
+        y = df_radwave.y.values
+        z = df_radwave.z.values
+
+        data_list.append(
+            go.Scatter3d(
+                x=x, 
+                y=y, 
+                z=z, 
+                mode='markers', 
+                name = 'Radwave', 
+                marker = dict(size=.75, color='cyan')
+            )
+        )
+    if plot_2d == True:
+        data_list.append(go.Scatter(x = x, 
+                                y = y, 
+                                z = z, 
+                                u = vx_rf, 
+                                v = vy_rf, 
+                                w = vz_rf,
+                                sizemode = 'scaled',
+                                sizeref = cone_size,
+                                cauto = False,
+                                colorscale = 'Plotly3',
+                                ))
+
+        
+ 
+    else:
+        # ---- writing the figure and loading the data ---- #
+        layout = go.Layout(scene = dict(aspectmode=aspectmode, 
+                           xaxis = dict(title = 'x (pc)'), 
+                           yaxis = dict(title = 'y (pc)'), 
+                           zaxis = dict(title = 'z (pc)')))
+
+        fig = go.Figure(data_list, layout = layout)
+        fig.update_layout(showlegend = False, template = 'plotly')
+        fig.write_html('kinematics_plots/obp-near.html', auto_open = True)
+    #     fig.write_html('kinematics_plots/3d_kinematics_cluster{}.html'.format(cluster_number), auto_open = False)
+
+        fig.show()
+
+def plotly_whole_orion(dfs : list, vel_mag_bin : tuple, cone_size = 1, aspectmode = 'data'):
+
+    vel_mag_lb, vel_mag_ub = vel_mag_bin
+
+    vx_avg = []
+    vy_avg = []
+    vz_avg = []
+
+    for df in dfs:
+
+        vx = np.median(df.vx.values)
+        vy = np.median(df.vy.values)
+        vz = np.median(df.vz.values)
+        
+        vx_avg.append(vx)
+        vy_avg.append(vy)
+        vz_avg.append(vz)
+
+    vx_avg = np.median(np.array(vx_avg))
+    vy_avg = np.median(np.array(vy_avg))
+    vz_avg = np.median(np.array(vz_avg))
+
+    xc_list = []
+    yc_list = []
+    zc_list = []
+    vx_rf_list = []
+    vy_rf_list = []
+    vz_rf_list = []
+
+
+    df_all = pd.concat(dfs)
+
+    xc_list = df_all.x.values
+    yc_list = df_all.y.values
+    zc_list = df_all.z.values
+
+    vx_rf_list = df_all.vx.values - vx_avg
+    vy_rf_list = df_all.vy.values - vy_avg
+    vz_rf_list = df_all.vz.values - vz_avg
+    
+    vel_mag_rf = np.sqrt(vx_rf_list**2 + vy_rf_list**2 + vz_rf_list**2)
+
+    xc_list = xc_list[np.where((vel_mag_rf >= vel_mag_lb) & (vel_mag_rf <= vel_mag_ub))]
+    yc_list = yc_list[np.where((vel_mag_rf >= vel_mag_lb) & (vel_mag_rf <= vel_mag_ub))]
+    zc_list = zc_list[np.where((vel_mag_rf >= vel_mag_lb) & (vel_mag_rf <= vel_mag_ub))]
+    vx_rf_list = vx_rf_list[np.where((vel_mag_rf >= vel_mag_lb) & (vel_mag_rf <= vel_mag_ub))]
+    vy_rf_list = vy_rf_list[np.where((vel_mag_rf >= vel_mag_lb) & (vel_mag_rf <= vel_mag_ub))]
+    vz_rf_list = vz_rf_list[np.where((vel_mag_rf >= vel_mag_lb) & (vel_mag_rf <= vel_mag_ub))]
+
+
+        
+    plot_list = []
+    group_vectors = go.Cone(x=xc_list,
+                            y = yc_list,
+                            z = zc_list,
+                            u = vx_rf_list,
+                            v = vy_rf_list,
+                            w = vz_rf_list,
+                            sizemode = 'scaled',
+                            sizeref = cone_size,
+                            cauto = False,
+                            colorscale = 'Plotly3')
+
+    sun = go.Scatter3d(x = [0], 
+                       y = [0], 
+                       z = [0],
+                       marker = dict(
+                       size  = 5,
+                       color = 'yellow'))
+
+    df_radwave = pd.read_csv(
+        '/Users/cam/Desktop/astro_research/orion/orion_populations/Best_Fit_Wave_Model.csv')
+    
+    x = df_radwave.x.values
+    y = df_radwave.y.values
+    z = df_radwave.z.values
+
+    plot_list.append(
+        go.Scatter3d(
+            x=x, 
+            y=y, 
+            z=z, 
+            mode='markers', 
+            name = 'Radwave', 
+            marker = dict(size=.75, color='black')
+        )
+    )
+    plot_list.append(group_vectors)
+    plot_list.append(sun)
+
+    layout = go.Layout(scene = dict(aspectmode = aspectmode))
+    fig = go.Figure(plot_list, layout = layout)
+    fig.update_layout(showlegend = False, template = 'plotly')
+    fig.show()
+

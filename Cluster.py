@@ -147,8 +147,8 @@ class cluster:
         ax.set_title(self.name + ' CMD')
         ax.set_xlabel(r'$G_{Bp} - G_{Rp}$')
         ax.set_ylabel(r'$M_g$')
-        ax.set_xlim(min(color) - .15, max(color) + .15)
-        ax.set_ylim(min(abs_mag) - .15, max(abs_mag) + .15)
+        #ax.set_xlim(min(color) - .15, max(color) + .15)
+        #ax.set_ylim(min(abs_mag) - .15, max(abs_mag) + .15)
         plt.gca().invert_yaxis()
         if show == True:
             plt.show()
